@@ -59,17 +59,69 @@ You should complete these only after you have completed the practical assignment
 The business goal of the game database is to provide an internal service to get data for all apps from all app stores.  
 Many other applications will use consume this API.
 
-#### Question 1:
-We are planning to put this project in production. According to you, what are the missing pieces to make this project production ready? 
+## Question 1
+> We are planning to put this project in production. According to you, what are the missing pieces to make this project production ready? 
 Please elaborate an action plan.
 
-#### Question 2:
-Let's pretend our data team is now delivering new files every day into the S3 bucket, and our service needs to ingest those files
+### Overall improvements
+- **Extended tests** : submitted application clearly lacks unit tests, integration as well as perfromance tests ; coverage would need to be a lot better for this to go into production
+- **Extended logs** : current logs are minimal and need to be more detailed and structured in order to be exploitable for monitoring purposes
+- **Externalize logs** : current logs are neither stored locally or externalized, this would need to be the case in a production setting (i.e. Datadog)
+- **Parallelization** : each task to fetch the `json` files is independent and can thus be parallelized to improve overall performances (i.e. Android and iOS in parallel)
+- **Data validation** : current ingestion pipeline neither checks raw data (i.e. duplicate app pair, missing field, bad data types, etc.) nor performs data consistency checks along the pipeline (i.e. make sure ranking is correct, etc.)
+- **Execution process logging** : current pipeline does not check if ingestion was done already (i.e. we can click the button 100 times and it'll keep fetching the same data over and over again). Ingestion steps should be persisted as well and leveraged to only fetch data that as changed for instance (i.e. incremental ingestion) 
+- **Typing** : current pipeline is written in Javascript so no request/objects are typed ; Typescript should be used instead to make it more robust
+- **Reading remote files by chunk** : if files are to become larger and larger, the ingestion of raw files should be done by chunk to prevent memory overload
+- **Better table structure** : database structure should be improved/enriched to prevent duplicate entries (i.e. unique keys on `appId` and `platform` or anything that makes sense from a business point of view)
+- **Proper games refetch** : call to fetch games should be refactored to isolate the logic
+
+### Product improvements
+
+- **Pagination** : current app display all data without any pagination ; when the list gets big it 1) becomes unreadable and 2) degrades overall performance
+- **Loader** : include component-level loaders (i.e. in the table to show that games data is loading and on the "Populate" button to show the process is still running)
+- **Populate flexibility** : backend was built to receive parameters from the frontend (i.e. populate data only for a specific platform and only the first N games) however the frontend does not provide dropdowns or input fields to get this config from the user
+
+### Question 2
+> Let's pretend our data team is now delivering new files every day into the S3 bucket, and our service needs to ingest those files
 every day through the populate API. Could you describe a suitable solution to automate this? Feel free to propose architectural changes.
 
-#### Question 3:
-Both the current database schema and the files dropped in the S3 bucket are not optimal.
+**Assumptions**
+1. Files are dumped onto a single bucket S3 (not splitted by platform or else)
+2. Files follow a specific convention with timestamps in the filename
+
+**Overall logic**
+1. Data team dumps files daily (_assumption 1 and 2_)
+2. A trigger on "ObjectCreated:Put" is setup to call a lambda function
+3. Two alternatives depending on where the API is hosted
+
+*Alternative 1* : API is hosted as an external service somewhere (here EC2 but it can be anywhere else as long as it is accessible via HTTPS)
+
+In this alternative the lambda function will simply make an API call to fetch the latest data.
+
+[[https://github.com/nicnhus22/aura/blob/main/doc/images/archi-1.jpg|alt=Architecture_1]]
+
+*Alternative 2* : API can directly be hosted within lambdas and behind an API gateway so we don't need to call another API from within the lambda
+
+In this alternative the lambda function directly executes the logic* to fetch the latest data.
+
+[[https://github.com/nicnhus22/aura/blob/main/doc/images/archi-2.jpg|alt=Architecture_2]]
+
+4. The API is to go and fetch all files that have not be processed yet (i.e. not in `./archive` folder) and dump them into a dedicated RDS table (or else, does not matter here)
+5. The last step is to move all processed files into the `./archive` folder to not process them twice
+
+### Question 3
+> Both the current database schema and the files dropped in the S3 bucket are not optimal.
 Can you find ways to improve them?
 
+#### Database
 
+- `Game` does not have unique constraints and the ID is auto-generated so this does not prevent from having duplicates. This can be fixed by adding a unique constraint on some columns (let's say `storeId` and `bundleId` if that makes sense from a business POV). 
+- `Game.version` is at the root level of the object which might not serve the right purpose : it looks more like a `latestVersion` ; otherwise many records (as many as there are different versions) of the same game can be added in this DB.
+- In general the `Game` table isn't very straight forward : 
+  - Is this a list of unique games, in which case we should remove some historized attributes (like version, ranking, etc.) and store them in different tables depending on what we'd like to do (i.e. having a `game_version` with the FK to the game object and all different version with there version-specific attributes like `published_date`, etc.)
+  - Is this an historized list of games, in which case we should keep all records and filter on the latest version of a game's record if we want to display this kind of view.
 
+#### Files
+
+- Files are structured as nested arrays `[[[game1, game2, game3], [game4, game5, game6]]` so the pipeline has to flatten the array to control the DB bulk size upon insert.
+- Files should follow better naming convention to be more explicit (i.e. include a timestamp for the extraction)
