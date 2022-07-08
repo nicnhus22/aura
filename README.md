@@ -98,13 +98,13 @@ every day through the populate API. Could you describe a suitable solution to au
 
 In this alternative the lambda function will simply make an API call to fetch the latest data.
 
-[[https://github.com/nicnhus22/aura/blob/main/doc/images/archi-1.jpg|alt=Architecture_1]]
+![Architecture 1](/doc/images/archi-1.jpg)
 
 *Alternative 2* : API can directly be hosted within lambdas and behind an API gateway so we don't need to call another API from within the lambda
 
 In this alternative the lambda function directly executes the logic* to fetch the latest data.
 
-[[https://github.com/nicnhus22/aura/blob/main/doc/images/archi-2.jpg|alt=Architecture_2]]
+![Architecture 2](/doc/images/archi-2.jpg)
 
 4. The API is to go and fetch all files that have not be processed yet (i.e. not in `./archive` folder) and dump them into a dedicated RDS table (or else, does not matter here)
 5. The last step is to move all processed files into the `./archive` folder to not process them twice
