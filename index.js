@@ -1,6 +1,9 @@
 const express = require('express');
 const bodyParser = require('body-parser');
+const Sequelize = require('sequelize');
 const db = require('./models');
+
+const Op = Sequelize.Op;
 
 const app = express();
 
@@ -50,6 +53,30 @@ app.put('/api/games/:id', async (req, res) => {
     return res.send(game)
   } catch (err) {
     console.error('***Error updating game', err);
+    return res.status(400).send(err);
+  }
+});
+
+app.post('/api/games/search', async (req, res) => {
+  const { name, platform } = req.body;
+
+  let where = {
+    name: {
+        [Op.like]:  `%${name}%`
+    },
+  };
+
+  if(platform) {
+    where.platform = platform
+  }
+
+  try {
+    const game = await db.Game.findAll({
+      where: where
+    })
+    return res.send(game)
+  } catch (err) {
+    console.error('***There was an error searching for games', err);
     return res.status(400).send(err);
   }
 });
