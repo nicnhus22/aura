@@ -1,7 +1,9 @@
 const express = require('express');
+const _ = require('lodash');
 const bodyParser = require('body-parser');
 const Sequelize = require('sequelize');
 const db = require('./models');
+const fetchTopNGamesForPlatform = require('./services/game')
 
 const Op = Sequelize.Op;
 
@@ -66,7 +68,7 @@ app.post('/api/games/search', async (req, res) => {
     },
   };
 
-  if(platform) {
+  if(!_.isNil(platform) && !_.isEmpty(platform)) {
     where.platform = platform
   }
 
@@ -75,6 +77,27 @@ app.post('/api/games/search', async (req, res) => {
       where: where
     })
     return res.send(game)
+  } catch (err) {
+    console.error('***There was an error searching for games', err);
+    return res.status(400).send(err);
+  }
+});
+
+app.post('/api/games/populate', async (req, res) => {
+  try {
+    const platforms = ["android", "ios"]
+
+    for(const platform of platforms) {
+      console.log(`Populating games from source ${platform}`);
+
+      const games = await fetchTopNGamesForPlatform(platform);
+
+      await db.Game.bulkCreate(games);
+
+      console.log(`Populated ${games.length} games for platform ${platform}`)
+    }
+
+    return res.send()
   } catch (err) {
     console.error('***There was an error searching for games', err);
     return res.status(400).send(err);

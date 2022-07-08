@@ -27,6 +27,13 @@
       </div>
     </section>
 
+    <!-- Populate -->
+    <section class="section section-container" style="padding-bottom: 10px;">
+      <div class="box">
+        <populate-games @populate-games="populateTop100Games"/>
+      </div>
+    </section>
+
     <!-- Games list -->
     <section class="section section-container" style="padding-top: 24px; padding-bottom: 5px;">
         <h2 class="title">Games</h2>
@@ -212,9 +219,29 @@
     `
   }
 
+  const PopulateTop100 = {
+    methods: {
+      populateTop100Games() {
+        this.$emit('populate-games')
+      }
+    },
+    template: `
+       <form class="form" @submit.prevent="populateTop100Games">
+        <h2 class="title">Populate games</h2>
+        <h3>Top 100 games from both android and ios platforms will be populated by default</h3>
+        <br/>
+        <div class="field">
+          <div class="control">
+            <button class="button is-success">Populate</button>
+          </div>
+        </div>
+      </form>
+    `
+  }
+
   new Vue({
     el: '#app',
-    components: { game: Game, 'add-update-game': AddUpdateGame, 'search-games': Search },
+    components: { game: Game, 'add-update-game': AddUpdateGame, 'search-games': Search, 'populate-games': PopulateTop100 },
     data: {
       games: [],
       search: [],
@@ -260,6 +287,15 @@
           .then((response) => {
             this.games = response.data
           })
+      },
+      populateTop100Games () {
+        return axios.post(`${this.apiURL}/populate`)
+          .then((reponse) => {
+            axios.get(this.apiURL)
+              .then((response) => {
+                this.games = response.data;
+              })
+          });
       }
     },
     beforeMount () {
